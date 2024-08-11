@@ -1,6 +1,7 @@
 import time
 import gridfs
 from pymongo import MongoClient
+from pymongo.server_api import ServerApi
 from rdflib import Graph
 import config
 import services
@@ -8,7 +9,7 @@ import services
 ## TODO __init__ method
 
 ## MongoDB database conn
-client = MongoClient(config.MONGO_URI)
+client = MongoClient(config.MONGO_URI, server_api=ServerApi('1'))
 db = client[config.MONDO_DB]
 DISEASES_COLLECTION = db['diseases']
 DATA_MODEL_COLLECTION = db['data_model']
@@ -18,6 +19,13 @@ RO_COLLECTION = db['relationships']
 ECTO_COLLECTION = db['exposures']
 MAXO_COLLECTION = db['treatments']
 CHEBI_COLLECTION = db['chemicals']
+
+# Send a ping to confirm a successful connection
+try:
+    client.admin.command('ping')
+    print("Pinged your deployment. You successfully connected to MongoDB!")
+except Exception as e:
+    print(e)
 
 # FileGrid conn
 fs = gridfs.GridFS(db)

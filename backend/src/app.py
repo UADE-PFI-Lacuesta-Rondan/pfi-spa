@@ -6,12 +6,15 @@ from flask_cors import CORS
 import debugpy
 import config
 import debugger
+import generate_data_model
 
 # init debugger if needed
 debugger.init()
 
 app = Flask(__name__)
 CORS(app)
+
+generate_data_model.main()
 
 # Inicializar las rutas
 init_routes(app)

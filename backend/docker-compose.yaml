@@ -1,22 +1,24 @@
 version: '3.8'
 
 services:
-  mongo:
-    image: mongo:latest
-    ports:
-      - "27018:27018"
-    volumes:
-      - mongo-data:/data/db
-      - ./mongo_config/mongod.conf:/etc/mongo/mongod.conf:ro
-    command: ["mongod", "--config", "/etc/mongo/mongod.conf"]
+  #mongo:
+    # image: mongo:latest
+    # ports:
+    #   - "27018:27018"
+    # volumes:
+    #   - mongo-data:/data/db
+    #   - ./mongo_config/mongod.conf:/etc/mongo/mongod.conf:ro
+    # command: ["mongod", "--config", "/etc/mongo/mongod.conf"]
 
-  init-db:
-    build: .
-    command: python ./src/generate_data_model.py
-    depends_on:
-      - mongo
-    volumes:
-      - .:/app
+  #init-db:
+  #  build: .
+  #  command: python ./src/generate_data_model.py
+  #  #depends_on:
+    #  - mongo
+  #  volumes:
+  #    - .:/app
+  #  environment:
+  #    - MONGO_URI=mongodb://localhost:27018/
 
   web:
     build: .
@@ -28,7 +30,7 @@ services:
     volumes:
       - .:/app
     environment:
-      - MONGO_URI=mongodb://mongo:27018/
+      - MONGO_URI=mongo atlas uri
       - OPENAI_API_KEY=
       - FLASK_APP=src/app.py
       - FLASK_ENV=development
