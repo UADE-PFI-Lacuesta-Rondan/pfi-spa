@@ -1,7 +1,7 @@
-from asyncio import constants
 import json
 import poplib
 import tempfile
+import constants
 from flask import jsonify, make_response, request
 import services
 import repository
@@ -185,13 +185,24 @@ def init_routes(app):
     def get_relationship_types():
         return create_json_response(jsonify(services.get_relationship_types()), 200)
     
+
     @app.route("/diseases/predict_relationship", methods=["POST"])
     def predict_relationship():
 
         # new_disease_id = "MONDO_0006781"
+        # new_relationship_type = "has_relationship"
         # new_relationship_property = "RO_0004027"
-        data = request.get_json()
-        relationship_type = data['relationship_type']
+        body = request.json
+        disease_id = body.get('disease_id', '')
+        new_relationship_type = body.get('new_relationship_type', 'has_relationship')
+        new_relationship_property = body.get('new_relationship_property', [])
+
+        # Transform the IDs to include the full URI
+        full_disease_id = f"http://purl.obolibrary.org/obo/{disease_id}"
+        full_new_relationship_property = f"http://purl.obolibrary.org/obo/{new_relationship_property}"
+
+        # TODO default phenotype
+        relationship_type = services.get_relationship_type_for_property(full_new_relationship_property)
         
         if relationship_type == constants.UBERON_STR:
             model_name = 'anatomical'
@@ -200,9 +211,12 @@ def init_routes(app):
         else:
             return jsonify({'error': 'Invalid relationship type'}), 400
 
-        model = load_model_from_grid_fs(model_name)
-        prediction = model.predict([data['features']])
-        return jsonify({'prediction': prediction.tolist()})
+        predicted_target = services.predict_relationship(full_disease_id, new_relationship_type, full_new_relationship_property, model_name)
+        print(f'Predicted target: {predicted_target}')
+
+        services.update_data_model(full_disease_id, full_new_relationship_property, predicted_target)
+        
+        return create_json_response(jsonify(predicted_target), 200) 
 
     ################## DEBUG
     @app.route('/diseases/seen_labels', methods=['GET'])

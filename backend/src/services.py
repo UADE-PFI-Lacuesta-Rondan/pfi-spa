@@ -2,17 +2,13 @@ import json
 import os
 import random
 import tempfile
-import time
 
-from flask import jsonify, request
-from rdflib import Graph
+from pymongo import UpdateOne
 import utils
 import constants
 import repository
 import openai
 import joblib
-
-from pymongo import UpdateOne
 
 
 def set_llm_fields(disease):
@@ -57,7 +53,7 @@ def set_llm_fields(disease):
         disease['title'] = result_json['title']
         disease['causes'] = result_json['causes']
 
-def predict_relationship(disease_id, relationship_type, relationship_property):
+def predict_relationship(disease_id, relationship_type, relationship_property, model_name):
     """
     Predict the target ID for a given disease ID, relationship type, and relationship property
     using a pre-trained Random Forest model stored in MongoDB.
@@ -70,21 +66,30 @@ def predict_relationship(disease_id, relationship_type, relationship_property):
     Returns:
     str: The predicted target ID for the given inputs.
     """
+    
+    # random forest files stored in fileGrid
+    RANDOM_FOREST_MODEL_FILES = [
+        f'{model_name}.pkl',
+        f'le_disease_{model_name}.pkl',
+        f'le_relationship_property_{model_name}.pkl',
+        f'le_target_id_{model_name}.pkl',
+        f'le_disease_rel_prop_{model_name}.pkl',
+        f'le_cluster_{model_name}.pkl',
+    ]
 
     # wait if necessary
-    for filename in constants.RANDOM_FOREST_MODEL_FILES:
+    for filename in RANDOM_FOREST_MODEL_FILES:
         repository.wait_for_file_in_mongo(filename)
 
-    best_rf = load_json_from_mongo('best_rf.pkl')
-    le_disease = load_json_from_mongo('le_disease.pkl')
-    le_relationship_type = load_json_from_mongo('le_relationship_type.pkl')
-    le_relationship_property = load_json_from_mongo('le_relationship_property.pkl')
-    le_target_id = load_json_from_mongo('le_target_id.pkl')
-    le_disease_rel_prop = load_json_from_mongo('le_disease_rel_prop.pkl')
+    model = load_json_from_mongo(f'{model_name}.pkl')
+    le_disease = load_json_from_mongo(f'le_disease_{model_name}.pkl')
+    le_relationship_property = load_json_from_mongo(f'le_relationship_property_{model_name}.pkl')
+    le_target_id = load_json_from_mongo(f'le_target_id_{model_name}.pkl')
+    le_disease_rel_prop = load_json_from_mongo(f'le_disease_rel_prop_{model_name}.pkl')
+    le_cluster = load_json_from_mongo(f'le_cluster_{model_name}.pkl')
 
     # encode inputs
     disease_id_encoded = le_disease.transform([disease_id])[0]
-    relationship_type_encoded = le_relationship_type.transform([relationship_type])[0]
     relationship_property_encoded = le_relationship_property.transform([relationship_property])[0]
 
     # feature engineering transcode of the filters
@@ -96,8 +101,22 @@ def predict_relationship(disease_id, relationship_type, relationship_property):
     else:
         disease_rel_prop_encoded = le_disease_rel_prop.transform([disease_rel_prop])[0]
 
+    # cluster feature
+    cluster_feature = f"{disease_id_encoded}_{relationship_property_encoded}"
+    if cluster_feature not in le_cluster.classes_:
+        cluster_encoded = -1  # Handle unseen cluster labels
+    else:
+        cluster_encoded = le_cluster.transform([cluster_feature])[0]
+
+    input_features = [
+        disease_id_encoded,
+        relationship_property_encoded,
+        disease_rel_prop_encoded,
+        cluster_encoded
+    ]
+
     # predict
-    target_encoded = best_rf.predict([[disease_id_encoded, relationship_type_encoded, relationship_property_encoded, disease_rel_prop_encoded]])
+    target_encoded = model.predict([input_features])
     le_target_id.inverse_transform(target_encoded)
 
     # posible targets
@@ -137,6 +156,15 @@ def is_valid_relationship(property_id, target_id):
                 return True
         return False
     return True
+
+def get_relationship_type_for_property(property_id):
+    relationships_types = repository.get_data_model()['relationships_types']
+    if property_id in relationships_types:
+        valid_types = relationships_types[property_id]
+        for relationship in valid_types:
+            if relationship["target"] == property_id:
+                return relationship["type"]
+    return None
 
 def get_hierarchy_by_mondo_id(mondo_id):
 

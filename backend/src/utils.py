@@ -1,5 +1,6 @@
 import json
-from bson import ObjectId
+import os
+from pathlib import Path
 
 def convert_objectid_to_str(disease):
     if isinstance(disease, dict):
@@ -18,8 +19,15 @@ def convert_objectid_to_str(disease):
 
 # load file
 def load_json(file_path):
-    with open(file_path, 'r', encoding='utf-8') as file:
-        return json.load(file)
+    file = None
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return json.load(file)
+    except Exception as e:
+        print("Current Working Directory:", os.getcwd())
+        file_path = Path('/home/glacuesta/develop/repos/personal/pfi-spa/backend/datasets/mondo/mondo.json')
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return json.load(file)
 
 # load sparql query from file
 def load_sparql_query(file_path):

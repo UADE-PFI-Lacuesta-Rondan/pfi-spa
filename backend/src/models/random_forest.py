@@ -15,8 +15,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, silhouette_score
 from imblearn.over_sampling import RandomOverSampler
-from sklearn.decomposition import PCA
+#from sklearn.decomposition import PCA
 from sklearn.cluster import DBSCAN
+
+from imblearn.over_sampling import SMOTE
 
 def generate_model():
 
@@ -82,7 +84,7 @@ def generate_model_for_type(df, model_name, df_with_clusters, include_cluster=Fa
     df_with_clusters['Property'] = df_with_clusters['Property'].astype(str)
     df_with_clusters['Target'] = df_with_clusters['Target'].astype(str)
 
-    # merge dataframe with cluster DBSCAN dataframe
+    # merge dataframe with clustered dataframe
     df = pd.merge(df, df_with_clusters[['Disease ID', 'Property', 'Target', 'Cluster']],
                   left_on=['disease_id', 'relationship_property', 'target_id'],
                   right_on=['Disease ID', 'Property', 'Target'],
@@ -99,6 +101,10 @@ def generate_model_for_type(df, model_name, df_with_clusters, include_cluster=Fa
     df['disease_id'] = le_disease.fit_transform(df['disease_id'])
     df['relationship_property'] = le_relationship_property.fit_transform(df['relationship_property'])
     df['target_id'] = le_target_id.fit_transform(df['target_id'])
+
+    #print(df['disease_id'].value_counts())
+    #print(df['relationship_property'].value_counts())
+    #print(df['target_id'].value_counts())
 
     # disease_rel_prop characteristic is created by combining disease_id and relationship_property.
     df['disease_rel_prop'] = df['disease_id'].astype(str) + '_' + df['relationship_property'].astype(str)
@@ -121,6 +127,7 @@ def generate_model_for_type(df, model_name, df_with_clusters, include_cluster=Fa
     #X_sample, _, y_sample, _ = train_test_split(X, y, train_size=0.1, random_state=42)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
+    # data augmentation
     ros = RandomOverSampler(random_state=42)
     X_train_res, y_train_res = ros.fit_resample(X_train, y_train)
 
@@ -155,8 +162,11 @@ def generate_model_for_type(df, model_name, df_with_clusters, include_cluster=Fa
         f'le_disease_{model_name}.pkl': le_disease,
         f'le_relationship_property_{model_name}.pkl': le_relationship_property,
         f'le_target_id_{model_name}.pkl': le_target_id,
-        f'le_disease_rel_prop_{model_name}.pkl': le_disease_rel_prop
+        f'le_disease_rel_prop_{model_name}.pkl': le_disease_rel_prop,
     }
+
+    if include_cluster:
+        model_files[f'le_cluster_{model_name}.pkl'] = le_cluster
 
     for filename, model in model_files.items():
         with tempfile.NamedTemporaryFile() as temp_file:
@@ -168,8 +178,12 @@ def generate_model_for_type(df, model_name, df_with_clusters, include_cluster=Fa
        f'le_disease_{model_name}': le_disease.classes_.tolist(),
        f'le_relationship_property_{model_name}': le_relationship_property.classes_.tolist(),
        f'le_target_id_{model_name}': le_target_id.classes_.tolist(),
-       f'le_disease_rel_prop_{model_name}': le_disease_rel_prop.classes_.tolist()
+       f'le_disease_rel_prop_{model_name}': le_disease_rel_prop.classes_.tolist(),
     }
+
+    if include_cluster:
+        seen_labels[f'le_cluster_{model_name}'] = le_cluster.classes_.tolist()
+
     repository.fs.put(json.dumps(seen_labels).encode('utf-8'), filename=f'seen_labels_{model_name}.json')
 
 # Function to add relationships to the data
@@ -232,8 +246,6 @@ def clustering_data_frame():
     df = pd.get_dummies(df, columns=['Relationship Type'], prefix='RelType')
 
     df.head()
-    #output_file = 'preprocessed_disease_data.csv'
-    #df.to_csv(output_file, index=False)
 
     # select features for clustering
     features = ['Disease ID', 'Property', 'Target', 'RelType_anatomical_structures', 'RelType_chemicals', 'RelType_phenotypes']
@@ -265,17 +277,17 @@ def clustering_data_frame():
     print(f'Number of noise points: {n_noise}')
 
     # PCA for visualization
-    pca = PCA(n_components=2)
-    pca_result = pca.fit_transform(scaled_features)
+    #pca = PCA(n_components=2)
+    #pca_result = pca.fit_transform(scaled_features)
 
     # Plot the clusters
-    plt.figure(figsize=(10, 7))
-    plt.scatter(pca_result[:, 0], pca_result[:, 1], c=df['Cluster'], cmap='viridis', marker='o', edgecolor='k')
-    plt.title('DBSCAN Clustering with PCA')
-    plt.xlabel('PCA Component 1')
-    plt.ylabel('PCA Component 2')
-    plt.colorbar(label='Cluster Label')
-    plt.show()
+    #plt.figure(figsize=(10, 7))
+    #plt.scatter(pca_result[:, 0], pca_result[:, 1], c=df['Cluster'], cmap='viridis', marker='o', edgecolor='k')
+    #plt.title('DBSCAN Clustering with PCA')
+    #plt.xlabel('PCA Component 1')
+    #plt.ylabel('PCA Component 2')
+    #plt.colorbar(label='Cluster Label')
+    #plt.show()
 
     # silhouette score calculation based on scaled_features and computed clusters
     sil_score = silhouette_score(scaled_features, clusters)

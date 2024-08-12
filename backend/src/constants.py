@@ -35,16 +35,6 @@ OMIT_ENTITIES = {
     "http://purl.obolibrary.org/obo/MONDO_0005583"
 }
 
-# random forest files stored in fileGrid
-RANDOM_FOREST_MODEL_FILES = [
-    'best_rf.pkl',
-    'le_disease.pkl',
-    'le_relationship_type.pkl',
-    'le_relationship_property.pkl',
-    'le_target_id.pkl',
-    'le_disease_rel_prop.pkl'
-]
-
 LABEL_QUERY = '''PREFIX obo: <http://purl.obolibrary.org/obo/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
