@@ -1,4 +1,7 @@
+from asyncio import constants
 import json
+import poplib
+import tempfile
 from flask import jsonify, make_response, request
 import services
 import repository
@@ -186,23 +189,20 @@ def init_routes(app):
     def predict_relationship():
 
         # new_disease_id = "MONDO_0006781"
-        # new_relationship_type = "has_relationship"
         # new_relationship_property = "RO_0004027"
-        body = request.json
-        disease_id = body.get('disease_id', '')
-        new_relationship_type = body.get('new_relationship_type', 'has_relationship')
-        new_relationship_property = body.get('new_relationship_property', [])
-
-        # Transform the IDs to include the full URI
-        full_disease_id = f"http://purl.obolibrary.org/obo/{disease_id}"
-        full_new_relationship_property = f"http://purl.obolibrary.org/obo/{new_relationship_property}"
-
-        predicted_target = services.predict_relationship(full_disease_id, new_relationship_type, full_new_relationship_property)
-        print(f'Predicted target: {predicted_target}')
-
-        services.update_data_model(full_disease_id, full_new_relationship_property, predicted_target)
+        data = request.get_json()
+        relationship_type = data['relationship_type']
         
-        return create_json_response(jsonify(predicted_target), 200)
+        if relationship_type == constants.UBERON_STR:
+            model_name = 'anatomical'
+        elif relationship_type == constants.HP_STR:
+            model_name = 'phenotypes'
+        else:
+            return jsonify({'error': 'Invalid relationship type'}), 400
+
+        model = load_model_from_grid_fs(model_name)
+        prediction = model.predict([data['features']])
+        return jsonify({'prediction': prediction.tolist()})
 
     ################## DEBUG
     @app.route('/diseases/seen_labels', methods=['GET'])
@@ -216,3 +216,10 @@ def create_json_response(data, status_code=200):
     response = make_response(data, status_code)
     response.headers['Content-Type'] = 'application/json'
     return response
+
+def load_model_from_grid_fs(model_name):
+    with tempfile.NamedTemporaryFile() as temp_file:
+        model_file = repository.fs.find_one({'filename': f'{model_name}.pkl'})
+        temp_file.write(model_file.read())
+        temp_file.flush()
+        return poplib.load(temp_file.name)

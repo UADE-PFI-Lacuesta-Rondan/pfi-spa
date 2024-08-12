@@ -1,7 +1,7 @@
 import utils
 import models.random_forest as random_forest
 import models.ontogpt as ontogpt
-import models.dbscan as dbscan
+
 import constants
 
 import repository
@@ -309,7 +309,7 @@ def main():
 
     # apply train models
 
-    dbscan.preprocess_data_model()
+    #dbscan.clustering_data_frame()
     random_forest.generate_model()
     ontogpt.generate_model()
 
