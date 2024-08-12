@@ -1,9 +1,8 @@
 import utils
 import models.random_forest as random_forest
 import models.ontogpt as ontogpt
+import models.dbscan as dbscan
 import constants
-from rdflib import Graph, Namespace
-from rdflib.namespace import RDF, RDFS
 
 import repository
 
@@ -308,8 +307,9 @@ def main():
     # hpo ontology collection
     #repository.set_hpo_graph()
 
-    # train models
+    # apply train models
 
+    dbscan.preprocess_data_model()
     random_forest.generate_model()
     ontogpt.generate_model()
 

@@ -14,38 +14,14 @@ from imblearn.over_sampling import RandomOverSampler
 from scipy.stats import randint
 import joblib
 
-def generate_model():
-    """
-    Generate a RandomForest model using previously generated collections of diseases and data models,
-    and save the trained model and associated encoders to MongoDB.
+def get_data_frame(): 
 
-    This function performs the following steps:
-    1. Fetches data from MongoDB collections for diseases and data models.
-    2. Prepares the data for training by converting it into a suitable format.
-    3. Encodes categorical features and creates interaction features for better modeling.
-    4. Trains a RandomForest model using RandomizedSearchCV for hyperparameter optimization.
-    5. Evaluates the trained model on a test set.
-    6. Saves the trained model and encoders to MongoDB for future use.
-
-    Hyperparameters:
-    - n_estimators: Number of trees in the forest. Randomly chosen between 10 and 30. High number of n_estimators complexizes the model, giving better accuracy but reduced performance.
-    - max_depth: Maximum depth of the trees. Chosen from [10, 20, None]. Maximum depth of the tree will be 10, 20 or None. Nodes are expanded until all leaves are pure or until they contain fewer than min_samples_split samples.
-    - min_samples_split: Minimum number of samples required to split an internal node. Randomly chosen between 2 and 4.
-    - min_samples_leaf: Minimum number of samples required to be at a leaf node. Randomly chosen between 1 and 2.
-
-    Feature Engineering:
-    - Categorical features (disease_id, relationship_type, relationship_property, target_id) are encoded using LabelEncoder.
-    - An interaction feature (disease_rel_prop) is created by combining disease_id and relationship_property.
-    """
-    
     # get data structures previously generated collections
     diseases = repository.get_diseases()
     data_model = repository.get_data_model()
 
-    # Preparar los datos para el entrenamiento
     records = []
 
-    # Convertir la estructura de datos en un formato adecuado
     for disease in diseases:
         disease_id = disease['id']
         disease_name = disease['name']
@@ -151,11 +127,36 @@ def generate_model():
                 'relationship_property': chemical['property'],
                 'target_id': chemical['target']
             })
-
-    # Convertir los registros en un DataFrame
     df = pd.DataFrame(records)
+    return df
 
-    # Codificar datos categóricos
+def generate_model():
+    """
+    Generate a RandomForest model using previously generated collections of diseases and data models,
+    and save the trained model and associated encoders to MongoDB.
+
+    This function performs the following steps:
+    1. Fetches data from MongoDB collections for diseases and data models.
+    2. Prepares the data for training by converting it into a suitable format.
+    3. Encodes categorical features and creates interaction features for better modeling.
+    4. Trains a RandomForest model using RandomizedSearchCV for hyperparameter optimization.
+    5. Evaluates the trained model on a test set.
+    6. Saves the trained model and encoders to MongoDB for future use.
+
+    Hyperparameters:
+    - n_estimators: Number of trees in the forest. Randomly chosen between 10 and 30. High number of n_estimators complexizes the model, giving better accuracy but reduced performance.
+    - max_depth: Maximum depth of the trees. Chosen from [10, 20, None]. Maximum depth of the tree will be 10, 20 or None. Nodes are expanded until all leaves are pure or until they contain fewer than min_samples_split samples.
+    - min_samples_split: Minimum number of samples required to split an internal node. Randomly chosen between 2 and 4.
+    - min_samples_leaf: Minimum number of samples required to be at a leaf node. Randomly chosen between 1 and 2.
+
+    Feature Engineering:
+    - Categorical features (disease_id, relationship_type, relationship_property, target_id) are encoded using LabelEncoder.
+    - An interaction feature (disease_rel_prop) is created by combining disease_id and relationship_property.
+    """
+    
+    df = get_data_frame()
+
+    # categorical data encoding
     le_disease = LabelEncoder()
     le_relationship_type = LabelEncoder()
     le_relationship_property = LabelEncoder()
@@ -166,7 +167,7 @@ def generate_model():
     df['relationship_property'] = le_relationship_property.fit_transform(df['relationship_property'])
     df['target_id'] = le_target_id.fit_transform(df['target_id'])
 
-    # Ingeniería de características: crear características de interacción
+    # disease_rel_prop interaction characteristic
     df['disease_rel_prop'] = df['disease_id'].astype(str) + '_' + df['relationship_property'].astype(str)
     le_disease_rel_prop = LabelEncoder()
     df['disease_rel_prop'] = le_disease_rel_prop.fit_transform(df['disease_rel_prop'])
@@ -174,13 +175,13 @@ def generate_model():
     X = df[['disease_id', 'relationship_type', 'relationship_property', 'disease_rel_prop']]
     y = df['target_id']
 
-    # Reducir el tamaño de los datos para el entrenamiento
-    X_sample, _, y_sample, _ = train_test_split(X, y, train_size=0.1, random_state=42)
+    # reduce dataset
+    #X_sample, _, y_sample, _ = train_test_split(X, y, train_size=0.1, random_state=42)
 
-    # Dividir los datos reducidos en conjuntos de entrenamiento y prueba
-    X_train, X_test, y_train, y_test = train_test_split(X_sample, y_sample, test_size=0.2, random_state=42)
+    # split dataset into test/train
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Manejar el desequilibrio de clases con RandomOverSampler
+    # RandomOverSampler balance clases with randomOverSampler
     ros = RandomOverSampler(random_state=42)
     X_train_res, y_train_res = ros.fit_resample(X_train, y_train)
 
